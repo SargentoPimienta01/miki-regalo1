@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Regalo #1 · The Overtime Survival</title>
+<style>
+  /* =========================================================
+     RESET Y VARIABLES (estética terminal / arcade retro)
+     ========================================================= */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-0: #0a0e12;
+    --bg-1: #11161d;
+    --bg-2: #1a212b;
+    --border: #2a3441;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --green: #39d353;
+    --amber: #f0b429;
+    --red: #f85149;
+    --cyan: #58a6ff;
+    --glow-green: 0 0 10px rgba(57, 211, 83, 0.5);
+    --glow-red: 0 0 14px rgba(248, 81, 73, 0.6);
+  }
+
+  html, body {
+    height: 100%;
+    font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
+    background: var(--bg-0);
+    color: var(--text);
+    overflow: hidden;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background:
+      radial-gradient(ellipse at top, rgba(88, 166, 255, 0.05), transparent 50%),
+      radial-gradient(ellipse at bottom, rgba(248, 81, 73, 0.05), transparent 50%),
+      var(--bg-0);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  /* Scanlines retro sutiles */
+  body::after {
+    content: "";
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.15) 0px,
+      rgba(0, 0, 0, 0.15) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    pointer-events: none;
+    z-index: 999;
+    opacity: 0.4;
+  }
+
+  /* =========================================================
+     ENCABEZADO / HUD
+     ========================================================= */
+  header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    background: rgba(10, 14, 18, 0.9);
+    backdrop-filter: blur(6px);
+    z-index: 10;
+  }
+
+  header h1 {
+    font-size: clamp(0.9rem, 2.5vw, 1.2rem);
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  header h1 .tag { color: var(--green); text-shadow: var(--glow-green); }
+  header h1 .blink { animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .hud {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+  }
+  .hud .pill {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .hud .pill b { color: var(--green); }
+  .hud .pill.stress b { color: var(--amber); transition: color 0.3s; }
+  .hud .pill.stress.critical b { color: var(--red); }
+  .hud .pill small { color: var(--muted); }
+
+  /* =========================================================
+     LAYOUT PRINCIPAL
+     ========================================================= */
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 1rem;
+    padding: 1rem;
+    min-height: 0;
+  }
+
+  /* RESPONSIVE: Móvil */
+  @media (max-width: 860px) {
+    header {
+      padding: 0.75rem 1rem;
+    }
+    header h1 {
+      font-size: 0.85rem;
+    }
+    .hud {
+      font-size: 0.75rem;
+      gap: 0.5rem;
+    }
+    .hud .pill {
+      padding: 0.3rem 0.6rem;
+    }
+
+    main {
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr auto;
+      padding: 0.5rem;
+      gap: 0.5rem;
+    }
+    .info-panel {
+      max-height: 200px;
+      overflow-y: auto;
+      padding: 0.75rem;
+    }
+    .info-panel h2 {
+      font-size: 0.75rem;
+    }
+    .clock-display .time {
+      font-size: 1.5rem;
+    }
+  }
+
+  /* =========================================================
+     ÁREA DE JUEGO (donde aparecen los eventos)
+     ========================================================= */
+  .game-area {
+    position: relative;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    min-height: 400px;
+  }
+
+  /* Rejilla de fondo */
+  .game-area::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+  }
+
+  /* Shake cuando el estrés es crítico */
+  .game-area.shake { animation: shake 0.4s ease; }
+  @keyframes shake {
+    0%, 100% { transform: translate(0, 0); }
+    20% { transform: translate(-4px, 2px); }
+    40% { transform: translate(4px, -2px); }
+    60% { transform: translate(-3px, -2px); }
+    80% { transform: translate(3px, 2px); }
+  }
+
+  /* Overlay rojo cuando el estrés es crítico */
+  .game-area::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at center, transparent 40%, rgba(248, 81, 73, 0.15) 100%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .game-area.critical::after { opacity: 1; animation: pulseRed 1s ease-in-out infinite; }
+  @keyframes pulseRed {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+
+  /* Mensaje central inicial */
+  .start-hint {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--muted);
+    text-align: center;
+    font-size: 0.9rem;
+    pointer-events: none;
+  }
+  .start-hint.hidden { display: none; }
+
+  /* =========================================================
+     EVENTOS (pop-ups dentro del área de juego)
+     ========================================================= */
+  .event {
+    position: absolute;
+    background: var(--bg-2);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 0;
+    min-width: 220px;
+    max-width: 280px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    z-index: 5;
+    animation: popIn 0.3s cubic-bezier(.2, 1.4, .5, 1);
+    font-size: 0.85rem;
+  }
+
+  /* RESPONSIVE: Eventos más pequeños en móvil */
+  @media (max-width: 860px) {
+    .event {
+      min-width: 180px;
+      max-width: 220px;
+      font-size: 0.75rem;
+    }
+  }
+
+  @keyframes popIn {
+    from { transform: scale(0.5); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+  .event.resolving { animation: resolve 0.4s ease forwards; }
+  @keyframes resolve {
+    to { transform: scale(0.3) rotate(15deg); opacity: 0; }
+  }
+
+  .event-header {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .event-body { padding: 0.85rem 0.75rem; }
+
+  /* --- Bug de Código --- */
+  .event.bug { border-color: var(--red); }
+  .event.bug .event-header { background: rgba(248, 81, 73, 0.15); color: var(--red); }
+  .event.bug .close-x {
+    background: var(--red);
+    color: #000;
+    border: none;
+    width: 22px; height: 22px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    font-family: inherit;
+    transition: transform 0.1s;
+  }
+  .event.bug .close-x:hover { transform: scale(1.15); }
+  .event.bug .bug-msg {
+    color: var(--muted);
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+  .event.bug .bug-msg code { color: var(--amber); }
+
+  /* --- Servidor Caliente --- */
+  .event.server { border-color: var(--amber); }
+  .event.server .event-header { background: rgba(240, 180, 41, 0.15); color: var(--amber); }
+  .temp-bar {
+    height: 14px;
+    background: var(--bg-0);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.6rem;
+    position: relative;
+  }
+  .temp-bar > div {
+    height: 100%;
+    width: 50%;
+    background: linear-gradient(90deg, var(--green), var(--amber), var(--red));
+    transition: width 0.15s ease;
+  }
+  .cool-btn {
+    width: 100%;
+    padding: 0.55rem;
+    background: var(--cyan);
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    font-family: inherit;
+    font-weight: bold;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    transition: transform 0.08s;
+  }
+  .cool-btn:active { transform: scale(0.95); }
+  .server-info {
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 0.4rem;
+  }
+
+  /* --- Llamada Emergente --- */
+  .event.call { border-color: var(--cyan); }
+  .event.call .event-header { background: rgba(88, 166, 255, 0.15); color: var(--cyan); }
+  .keys-row {
+    display: flex;
+    justify-content: center;
+    gap: 0.4rem;
+    margin-bottom: 0.6rem;
+  }
+  .key {
+    width: 40px; height: 40px;
+    background: var(--bg-0);
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: var(--text);
+    transition: all 0.15s;
+  }
+
+  /* RESPONSIVE: Teclas más grandes en móvil */
+  @media (max-width: 860px) {
+    .key {
+      width: 50px;
+      height: 50px;
+      font-size: 1.3rem;
+    }
+  }
+
+  .key.done {
+    background: var(--green);
+    color: #000;
+    border-color: var(--green);
+    box-shadow: var(--glow-green);
+  }
+  .key.active {
+    border-color: var(--cyan);
+    box-shadow: 0 0 8px rgba(88, 166, 255, 0.5);
+    animation: keyPulse 0.8s ease-in-out infinite;
+  }
+  @keyframes keyPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+  }
+  .call-hint {
+    text-align: center;
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  /* =========================================================
+     PANEL LATERAL DE INFO
+     ========================================================= */
+  .info-panel {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    height: fit-content;
+  }
+  .info-panel h2 {
+    font-size: 0.85rem;
+    color: var(--cyan);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    border-bottom: 1px dashed var(--border);
+    padding-bottom: 0.5rem;
+  }
+  .clock-display {
+    text-align: center;
+    padding: 0.75rem;
+    background: var(--bg-0);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .clock-display .time {
+    font-size: 2rem;
+    color: var(--green);
+    text-shadow: var(--glow-green);
+    font-weight: bold;
+    letter-spacing: 0.05em;
+  }
+  .clock-display .label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-top: 0.25rem;
+  }
+
+  .stress-display {
+    background: var(--bg-0);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+  }
+  .stress-display .label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+    display: flex;
+    justify-content: space-between;
+  }
+  .stress-display .label b { color: var(--amber); }
+  .stress-bar {
+    height: 18px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .stress-bar > div {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--green), var(--amber), var(--red));
+    transition: width 0.2s ease;
+  }
+
+  .legend {
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .legend .item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.3rem;
+  }
+  .legend .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .legend .dot.red { background: var(--red); }
+  .legend .dot.amber { background: var(--amber); }
+  .legend .dot.cyan { background: var(--cyan); }
+
+  /* =========================================================
+     MODALES (victoria / game over)
+     ========================================================= */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+  }
+  .modal-overlay.active { display: flex; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .modal {
+    background: var(--bg-1);
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    max-width: 520px;
+    width: 100%;
+    text-align: center;
+    animation: popIn 0.5s cubic-bezier(.2, 1.4, .5, 1);
+  }
+  .modal.win { border: 1px solid var(--green); box-shadow: 0 0 40px rgba(57, 211, 83, 0.4); }
+  .modal.lose { border: 1px solid var(--red); box-shadow: 0 0 40px rgba(248, 81, 73, 0.4); }
+
+  /* RESPONSIVE: Modal más compacto en móvil */
+  @media (max-width: 860px) {
+    .modal {
+      padding: 2rem 1.5rem;
+    }
+    .modal .icon {
+      font-size: 3rem;
+    }
+    .modal h2 {
+      font-size: 1.2rem;
+    }
+    .modal p {
+      font-size: 0.9rem;
+    }
+  }
+
+  .modal .icon { font-size: 4rem; margin-bottom: 0.5rem; }
+  .modal h2 { font-size: 1.4rem; margin-bottom: 1rem; }
+  .modal.win h2 { color: var(--green); text-shadow: var(--glow-green); }
+  .modal.lose h2 { color: var(--red); text-shadow: var(--glow-red); }
+
+  .modal p {
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 0.95rem;
+    margin-bottom: 1.5rem;
+    font-style: italic;
+  }
+  .modal .verse {
+    color: var(--amber);
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+    font-style: normal;
+    font-weight: bold;
+    text-shadow: 0 0 8px rgba(240, 180, 41, 0.3);
+  }
+  .modal .stats {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-bottom: 1.25rem;
+  }
+  .modal .stats b { color: var(--amber); }
+
+  .modal .btn {
+    background: var(--green);
+    color: #000;
+    border: none;
+    padding: 0.8rem 1.8rem;
+    font-family: inherit;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: transform 0.15s ease, box-shadow 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .modal.lose .btn { background: var(--red); color: #fff; }
+  .modal .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(57, 211, 83, 0.4);
+  }
+  .modal.lose .btn:hover { box-shadow: 0 6px 20px rgba(248, 81, 73, 0.4); }
+
+  /* =========================================================
+     NÚMEROS FLOTANTES (feedback al resolver eventos)
+     ========================================================= */
+  .float-text {
+    position: absolute;
+    font-weight: bold;
+    font-size: 1.1rem;
+    pointer-events: none;
+    animation: floatUp 1s ease-out forwards;
+    z-index: 20;
+    text-shadow: 0 0 6px currentColor;
+  }
+  .float-text.good { color: var(--green); }
+  .float-text.bad { color: var(--red); }
+  @keyframes floatUp {
+    0%   { transform: translate(-50%, 0); opacity: 1; }
+    100% { transform: translate(-50%, -60px); opacity: 0; }
+  }
+
+  /* Pantalla de inicio */
+  .start-screen {
+    position: absolute; inset: 0;
+    background: rgba(10, 14, 18, 0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: 2rem;
+    text-align: center;
+  }
+  .start-screen.hidden { display: none; }
+  .start-screen h2 {
+    color: var(--green);
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
+    text-shadow: var(--glow-green);
+  }
+  .start-screen p {
+    color: var(--muted);
+    max-width: 420px;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+  }
+  .start-screen .btn {
+    background: var(--green);
+    color: #000;
+    border: none;
+    padding: 0.9rem 2rem;
+    font-family: inherit;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    animation: pulseBtn 1.5s ease-in-out infinite;
+  }
+  @keyframes pulseBtn {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(57, 211, 83, 0.5); }
+    50% { box-shadow: 0 0 0 12px rgba(57, 211, 83, 0); }
+  }
+
+  footer {
+    padding: 0.5rem 1rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.7rem;
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+  <!-- ================= ENCABEZADO / HUD ================= -->
+  <header>
+    <h1>
+      <span class="tag">&gt;_</span>
+      Regalo #1 · The Overtime Survival
+      <span class="blink">▮</span>
+    </h1>
+    <div class="hud">
+      <div class="pill">⏱ <b id="hud-time">9:00 AM</b></div>
+      <div class="pill stress" id="hud-stress-pill">
+        💢 Estrés: <b id="hud-stress">0%</b>
+      </div>
+      <div class="pill">🎯 Eventos: <b id="hud-events">0</b></div>
+    </div>
+  </header>
+
+  <!-- ================= LAYOUT PRINCIPAL ================= -->
+  <main>
+    <!-- ÁREA DE JUEGO -->
+    <section class="game-area" id="game-area">
+
+      <!-- Pantalla de inicio -->
+      <div class="start-screen" id="start-screen">
+        <h2>⚠️ Jornada de 60 segundos</h2>
+        <p>
+          Son las <b style="color:var(--green)">9:00 AM</b>. Miki! debes sobrevivir hasta las
+          <b style="color:var(--green)">5:00 PM</b> resolviendo bugs, enfriando servidores
+          y colgando llamadas antes de que tu estrés llegue al 100% para que puedas ver tu regalo.
+        </p>
+        <button class="btn" id="btn-start">▶ Iniciar jornada</button>
+      </div>
+
+      <div class="start-hint" id="start-hint">Los eventos aparecerán aquí...</div>
+    </section>
+
+    <!-- PANEL LATERAL -->
+    <aside class="info-panel">
+      <div>
+        <h2>🕘 Reloj de oficina</h2>
+        <div class="clock-display">
+          <div class="time" id="clock">9:00 AM</div>
+          <div class="label">Hora actual</div>
+        </div>
+      </div>
+
+      <div>
+        <h2>💢 Nivel de Estrés</h2>
+        <div class="stress-display">
+          <div class="label"><span>Barra de estrés</span> <b id="stress-pct">0%</b></div>
+          <div class="stress-bar"><div id="stress-fill"></div></div>
+        </div>
+      </div>
+
+      <div>
+        <h2>📋 Tipos de eventos</h2>
+        <div class="legend">
+          <div class="item"><span class="dot red"></span> <b>Bug:</b> cierra la ventana (X)</div>
+          <div class="item"><span class="dot amber"></span> <b>Servidor:</b> spamea "Enfriar"</div>
+          <div class="item"><span class="dot cyan"></span> <b>Llamada:</b> pulsa las 3 teclas</div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- ================= MODAL DE VICTORIA ================= -->
+  <div class="modal-overlay" id="modal-win">
+    <div class="modal win">
+      <div class="icon">🏆</div>
+      <h2>¡Has completado El Regalo del Trabajo!</h2>
+      <p>
+        "El trabajo no es un castigo, sino la oportunidad de dejar nuestra huella
+        en el mundo. Quien aprende a dominar el caos y el esfuerzo con paciencia,
+        nunca conocerá la escasez."
+      </p>
+      <div class="verse">
+        "Todo lo que halle tu mano para hacer, hazlo según tus fuerzas."<br>
+        — Eclesiastés 9:10
+      </div>
+      <div class="stats">
+        Eventos resueltos: <b id="win-resolved">0</b> ·
+        Estrés final: <b id="win-stress">0%</b>
+      </div>
+      <button class="btn" id="btn-continue">↻ Jugar de nuevo</button>
+    </div>
+  </div>
+
+  <!-- ================= MODAL DE GAME OVER ================= -->
+  <div class="modal-overlay" id="modal-lose">
+    <div class="modal lose">
+      <div class="icon">💥</div>
+      <h2>¡Burnout total!</h2>
+      <p>
+        Tu estrés llegó al 100%. La jornada te ha derrotado...
+        pero cada intento te hace más fuerte. ¡Inténtalo de nuevo!
+      </p>
+      <div class="stats">
+        Sobreviviste: <b id="lose-time">0s</b> ·
+        Eventos resueltos: <b id="lose-resolved">0</b>
+      </div>
+      <button class="btn" id="btn-retry">↻ Reintentar</button>
+    </div>
+  </div>
+
+  <footer>Estado: <span id="save-status">esperando...</span></footer>
+
+<script>
+/* =============================================================
+   THE OVERTIME SURVIVAL — Lógica del minijuego
+   =============================================================
+   - 60 segundos reales = 9:00 AM → 5:00 PM
+   - Eventos aleatorios cada 3-5s
+   - Cada evento activo aumenta el estrés por segundo
+   - Victoria: sobrevivir 60s
+   - Derrota: estrés >= 100%
+   - Responsive: detecta móvil vs desktop
+   ============================================================= */
+
+// ---------- DETECCIÓN DE DISPOSITIVO ----------
+const esMovil = window.matchMedia('(max-width: 860px)').matches;
+
+// ---------- CONSTANTES ----------
+const DURACION_SEGUNDOS = 60;
+const META_ESTRES = 100;
+const SPAWN_MIN = esMovil ? 4000 : 3000;  // Más lento en móvil
+const SPAWN_MAX = esMovil ? 6000 : 5000;  // Más lento en móvil
+const STORAGE_KEY = 'regalo_01_completado';
+
+// Contribución al estrés por segundo de cada tipo de evento
+const ESTRES_POR_SEGUNDO = {
+  bug: esMovil ? 2.0 : 2.5,      // Menos estrés en móvil
+  server: esMovil ? 3.0 : 3.5,
+  call: esMovil ? 2.5 : 3.0
+};
+
+// Vida (HP) de cada evento: cuántas "acciones" para resolverlo
+const EVENT_HP = {
+  bug: 1,      // 1 clic en X
+  server: esMovil ? 8 : 10,  // Menos clics en móvil
+  call: 3      // 3 teclas correctas
+};
+
+const TECLAS_POSIBLES = ['Q', 'W', 'E', 'R', 'A', 'S', 'D', 'F'];
+
+// ---------- ESTADO DEL JUEGO ----------
+const state = {
+  corriendo: false,
+  tiempoTranscurrido: 0,     // segundos reales
+  estres: 0,                 // 0-100
+  eventos: new Map(),        // id → evento
+  eventosResueltos: 0,
+  siguienteId: 1,
+  spawnTimerId: null,
+  gameLoopId: null,
+  clockTimerId: null,
+  ultimoTick: 0
+};
+
+// ---------- REFERENCIAS AL DOM ----------
+const $ = (id) => document.getElementById(id);
+const gameArea      = $('game-area');
+const startScreen   = $('start-screen');
+const startHint     = $('start-hint');
+const btnStart      = $('btn-start');
+const clockEl       = $('clock');
+const hudTime       = $('hud-time');
+const hudStress     = $('hud-stress');
+const hudStressPill = $('hud-stress-pill');
+const hudEvents     = $('hud-events');
+const stressFill    = $('stress-fill');
+const stressPct     = $('stress-pct');
+const modalWin      = $('modal-win');
+const modalLose     = $('modal-lose');
+const btnContinue   = $('btn-continue');
+const btnRetry      = $('btn-retry');
+const saveStatusEl  = $('save-status');
+const winResolved   = $('win-resolved');
+const winStress     = $('win-stress');
+const loseTime      = $('lose-time');
+const loseResolved  = $('lose-resolved');
+
+// ---------- UTILIDADES ----------
+function rand(min, max) { return Math.random() * (max - min) + min; }
+function randInt(min, max) { return Math.floor(rand(min, max + 1)); }
+function pick(arr) { return arr[randInt(0, arr.length - 1)]; }
+
+// Convierte segundos transcurridos (0-60) a hora del reloj (9:00 AM → 5:00 PM)
+function formatearHora(segundos) {
+  // 60s reales = 480 min (8 horas) → 1s real = 8 min juego
+  const minutosJuego = Math.floor((segundos / DURACION_SEGUNDOS) * 480);
+  const horaBase = 9; // 9 AM
+  const totalMinutos = horaBase * 60 + minutosJuego;
+  let h = Math.floor(totalMinutos / 60);
+  const m = totalMinutos % 60;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  if (h > 12) h -= 12;
+  if (h === 0) h = 12;
+  return `${h}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
+// ---------- ACTUALIZAR UI ----------
+function actualizarUI() {
+  const hora = formatearHora(state.tiempoTranscurrido);
+  clockEl.textContent = hora;
+  hudTime.textContent = hora;
+
+  const estresRed = Math.min(100, Math.floor(state.estres));
+  hudStress.textContent = estresRed + '%';
+  stressPct.textContent = estresRed + '%';
+  stressFill.style.width = estresRed + '%';
+
+  // Estado crítico
+  const esCritico = state.estres >= 70;
+  hudStressPill.classList.toggle('critical', esCritico);
+  gameArea.classList.toggle('critical', esCritico);
+
+  hudEvents.textContent = state.eventos.size;
+}
+
+// ---------- SPAWN DE EVENTOS ----------
+function programarSiguienteSpawn() {
+  if (!state.corriendo) return;
+  const delay = randInt(SPAWN_MIN, SPAWN_MAX);
+  state.spawnTimerId = setTimeout(() => {
+    if (!state.corriendo) return;
+    // Limitar eventos activos simultáneos para que sea jugable
+    const maxEventos = esMovil ? 3 : 5;  // Menos eventos en móvil
+    if (state.eventos.size < maxEventos) {
+      spawnEvento();
+    }
+    programarSiguienteSpawn();
+  }, delay);
+}
+
+function spawnEvento() {
+  const tipos = ['bug', 'server', 'call'];
+  const tipo = pick(tipos);
+  const id = state.siguienteId++;
+
+  const evento = {
+    id,
+    tipo,
+    hp: EVENT_HP[tipo],
+    hpMax: EVENT_HP[tipo],
+    element: null,
+    // Datos específicos por tipo
+    data: {}
+  };
+
+  // Crear DOM
+  evento.element = crearElementoEvento(evento);
+  gameArea.appendChild(evento.element);
+
+  // Posicionar
+  posicionarEvento(evento);
+
+  // Inicializar comportamiento específico
+  if (tipo === 'bug') inicializarBug(evento);
+  if (tipo === 'server') inicializarServer(evento);
+  if (tipo === 'call') inicializarCall(evento);
+
+  state.eventos.set(id, evento);
+  actualizarUI();
+}
+
+function posicionarEvento(evento) {
+  const areaRect = gameArea.getBoundingClientRect();
+  const el = evento.element;
+  const w = el.offsetWidth || 240;
+  const h = el.offsetHeight || 160;
+  const maxX = Math.max(10, areaRect.width - w - 10);
+  const maxY = Math.max(10, areaRect.height - h - 10);
+  const x = randInt(10, maxX);
+  const y = randInt(10, maxY);
+  el.style.left = x + 'px';
+  el.style.top  = y + 'px';
+}
+
+// ---------- CREAR ELEMENTOS DE EVENTOS ----------
+function crearElementoEvento(evento) {
+  const div = document.createElement('div');
+  div.className = `event ${evento.tipo}`;
+  div.dataset.id = evento.id;
+
+  if (evento.tipo === 'bug') {
+    div.innerHTML = `
+      <div class="event-header">
+        <span>🐞 Bug detectado</span>
+        <button class="close-x" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="event-body">
+        <div class="bug-msg">
+          <code>TypeError</code>: cannot read property 'sanity' of <code>null</code><br>
+          at <code>Monday.morning()</code>
+        </div>
+      </div>
+    `;
+  }
+  else if (evento.tipo === 'server') {
+    div.innerHTML = `
+      <div class="event-header">
+        <span>🔥 Servidor caliente</span>
+      </div>
+      <div class="event-body">
+        <div class="temp-bar"><div></div></div>
+        <button class="cool-btn">❄ Enfriar</button>
+        <div class="server-info">HP: <span class="hp">${EVENT_HP.server}</span> / ${EVENT_HP.server}</div>
+      </div>
+    `;
+  }
+  else if (evento.tipo === 'call') {
+    const keys = generarSecuenciaTeclas();
+    evento.data.secuencia = keys;
+    evento.data.progreso = 0;
+    div.innerHTML = `
+      <div class="event-header">
+        <span>📞 Llamada entrante</span>
+      </div>
+      <div class="event-body">
+        <div class="keys-row">
+          ${keys.map((k, i) => `<div class="key ${i === 0 ? 'active' : ''}" data-idx="${i}" data-key="${k}">${k}</div>`).join('')}
+        </div>
+        <div class="call-hint">${esMovil ? 'Toca las teclas en orden' : 'Presiona las teclas en orden'}</div>
+      </div>
+    `;
+  }
+
+  return div;
+}
+
+function generarSecuenciaTeclas() {
+  const secuencia = [];
+  const disponibles = [...TECLAS_POSIBLES];
+  for (let i = 0; i < 3; i++) {
+    const idx = randInt(0, disponibles.length - 1);
+    secuencia.push(disponibles[idx]);
+    disponibles.splice(idx, 1);
+  }
+  return secuencia;
+}
+
+// ---------- INICIALIZACIÓN DE COMPORTAMIENTOS ----------
+function inicializarBug(evento) {
+  // Movimiento errático por el área de juego
+  const el = evento.element;
+  const btnX = el.querySelector('.close-x');
+
+  // Velocidad más lenta en móvil
+  const velocidadBase = esMovil ? 0.8 : 1.2;
+
+  evento.data.movimiento = {
+    vx: rand(-velocidadBase, velocidadBase) || 0.5,
+    vy: rand(-velocidadBase, velocidadBase) || 0.5,
+    cambioTimer: 0
+  };
+
+  btnX.addEventListener('click', (e) => {
+    e.stopPropagation();
+    resolverEvento(evento);
+  });
+
+  // Soporte táctil para móvil
+  btnX.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    resolverEvento(evento);
+  });
+}
+
+function inicializarServer(evento) {
+  const el = evento.element;
+  const barra = el.querySelector('.temp-bar > div');
+  const btnCool = el.querySelector('.cool-btn');
+  const hpText = el.querySelector('.hp');
+
+  evento.data.temperatura = 50; // 0-100
+  evento.data.temperaturaSubida = true;
+
+  // La temperatura sube/baja automáticamente
+  const updateTemp = () => {
+    if (!state.corriendo || !state.eventos.has(evento.id)) return;
+    // Sube ~15%/s, el jugador debe contrarrestarla
+    evento.data.temperatura = Math.min(100, evento.data.temperatura + 0.25);
+    barra.style.width = evento.data.temperatura + '%';
+    requestAnimationFrame(updateTemp);
+  };
+  requestAnimationFrame(updateTemp);
+
+  const enfriarServidor = (e) => {
+    e.stopPropagation();
+    evento.data.temperatura = Math.max(0, evento.data.temperatura - 15);
+    barra.style.width = evento.data.temperatura + '%';
+    evento.hp -= 1;
+    hpText.textContent = Math.max(0, evento.hp);
+    if (evento.hp <= 0) {
+      resolverEvento(evento);
+    }
+  };
+
+  btnCool.addEventListener('click', enfriarServidor);
+  btnCool.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    enfriarServidor(e);
+  });
+}
+
+function inicializarCall(evento) {
+  const el = evento.element;
+  const keys = el.querySelectorAll('.key');
+
+  // En móvil, las teclas son clickeables
+  if (esMovil) {
+    keys.forEach((keyEl, idx) => {
+      const manejarTecla = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        procesarTeclaLlamada(evento, keyEl.dataset.key);
+      };
+      keyEl.addEventListener('click', manejarTecla);
+      keyEl.addEventListener('touchend', manejarTecla);
+    });
+  }
+  // En desktop se maneja globalmente con keydown
+}
+
+function procesarTeclaLlamada(evento, tecla) {
+  const secuencia = evento.data.secuencia;
+  const progreso = evento.data.progreso;
+
+  if (progreso >= secuencia.length) return;
+
+  if (tecla === secuencia[progreso]) {
+    // Correcta
+    evento.data.progreso++;
+    const keys = evento.element.querySelectorAll('.key');
+    keys[progreso].classList.remove('active');
+    keys[progreso].classList.add('done');
+    if (progreso + 1 < keys.length) {
+      keys[progreso + 1].classList.add('active');
+    }
+    if (evento.data.progreso >= secuencia.length) {
+      resolverEvento(evento);
+    }
+  } else {
+    // Incorrecta: resetear progreso
+    evento.data.progreso = 0;
+    const keys = evento.element.querySelectorAll('.key');
+    keys.forEach((k, i) => {
+      k.classList.remove('done', 'active');
+      if (i === 0) k.classList.add('active');
+    });
+    // Feedback visual de error
+    evento.element.style.animation = 'none';
+    void evento.element.offsetWidth;
+    evento.element.style.animation = 'shake 0.3s ease';
+  }
+}
+
+// ---------- RESOLVER EVENTO ----------
+function resolverEvento(evento) {
+  if (!state.eventos.has(evento.id)) return;
+
+  const el = evento.element;
+  el.classList.add('resolving');
+
+  // Feedback visual
+  const rect = el.getBoundingClientRect();
+  const areaRect = gameArea.getBoundingClientRect();
+  crearTextoFlotante(
+    rect.left - areaRect.left + rect.width / 2,
+    rect.top - areaRect.top,
+    '✓ RESUELTO',
+    'good'
+  );
+
+  state.eventosResueltos++;
+
+  setTimeout(() => {
+    el.remove();
+    state.eventos.delete(evento.id);
+    actualizarUI();
+  }, 400);
+}
+
+function crearTextoFlotante(x, y, texto, tipo) {
+  const span = document.createElement('span');
+  span.className = `float-text ${tipo}`;
+  span.textContent = texto;
+  span.style.left = x + 'px';
+  span.style.top  = y + 'px';
+  gameArea.appendChild(span);
+  setTimeout(() => span.remove(), 1000);
+}
+
+// ---------- ACTUALIZAR EVENTOS (movimiento del bug) ----------
+function actualizarEventos(dt) {
+  state.eventos.forEach(evento => {
+    if (evento.tipo === 'bug') {
+      const el = evento.element;
+      const data = evento.data.movimiento;
+      const areaRect = gameArea.getBoundingClientRect();
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+
+      let x = parseFloat(el.style.left) || 0;
+      let y = parseFloat(el.style.top)  || 0;
+
+      x += data.vx * dt * 60;
+      y += data.vy * dt * 60;
+
+      // Rebote en bordes
+      if (x <= 0 || x + w >= areaRect.width)  { data.vx *= -1; x = Math.max(0, Math.min(x, areaRect.width - w)); }
+      if (y <= 0 || y + h >= areaRect.height) { data.vy *= -1; y = Math.max(0, Math.min(y, areaRect.height - h)); }
+
+      // Cambio ocasional de dirección
+      data.cambioTimer += dt;
+      const cambioIntervalo = esMovil ? 2.0 : 1.5;
+      if (data.cambioTimer > cambioIntervalo) {
+        data.cambioTimer = 0;
+        const velocidadBase = esMovil ? 1.0 : 1.5;
+        data.vx = rand(-velocidadBase, velocidadBase) || 0.5;
+        data.vy = rand(-velocidadBase, velocidadBase) || 0.5;
+      }
+
+      el.style.left = x + 'px';
+      el.style.top  = y + 'px';
+    }
+  });
+}
+
+// ---------- GAME LOOP ----------
+function gameLoop(timestamp) {
+  if (!state.corriendo) return;
+
+  if (!state.ultimoTick) state.ultimoTick = timestamp;
+  const dt = Math.min(0.1, (timestamp - state.ultimoTick) / 1000); // delta en segundos, capped
+  state.ultimoTick = timestamp;
+
+  // Actualizar estrés
+  let contribucionEstres = 0;
+  state.eventos.forEach(ev => {
+    contribucionEstres += ESTRES_POR_SEGUNDO[ev.tipo];
+  });
+
+  // Si no hay eventos, el estrés baja lentamente
+  if (state.eventos.size === 0) {
+    state.estres = Math.max(0, state.estres - 2 * dt);
+  } else {
+    state.estres += contribucionEstres * dt;
+  }
+
+  // Actualizar movimiento de eventos
+  actualizarEventos(dt);
+
+  // Actualizar UI
+  actualizarUI();
+
+  // Verificar condiciones
+  if (state.estres >= META_ESTRES) {
+    gameover();
+    return;
+  }
+
+  state.gameLoopId = requestAnimationFrame(gameLoop);
+}
+
+// ---------- RELOJ (1s real = 1 tick) ----------
+function tickReloj() {
+  if (!state.corriendo) return;
+  state.tiempoTranscurrido += 1;
+  actualizarUI();
+
+  if (state.tiempoTranscurrido >= DURACION_SEGUNDOS) {
+    victoria();
+  }
+}
+
+// ---------- INICIO / FIN ----------
+function iniciarJuego() {
+  // Reset completo
+  state.corriendo = true;
+  state.tiempoTranscurrido = 0;
+  state.estres = 0;
+  state.eventosResueltos = 0;
+  state.siguienteId = 1;
+  state.ultimoTick = 0;
+
+  // Limpiar eventos previos del DOM
+  state.eventos.forEach(ev => ev.element.remove());
+  state.eventos.clear();
+
+  startScreen.classList.add('hidden');
+  startHint.classList.add('hidden');
+  modalWin.classList.remove('active');
+  modalLose.classList.remove('active');
+
+  actualizarUI();
+
+  // Iniciar timers
+  state.clockTimerId = setInterval(tickReloj, 1000);
+  state.gameLoopId = requestAnimationFrame(gameLoop);
+  programarSiguienteSpawn();
+}
+
+function victoria() {
+  state.corriendo = false;
+  limpiarTimers();
+
+  winResolved.textContent = state.eventosResueltos;
+  winStress.textContent = Math.floor(state.estres) + '%';
+
+  // Guardar en localStorage
+  localStorage.setItem(STORAGE_KEY, 'true');
+  saveStatusEl.textContent = '¡completado ✓ guardado!';
+  saveStatusEl.style.color = 'var(--green)';
+
+  setTimeout(() => modalWin.classList.add('active'), 300);
+}
+
+function gameover() {
+  state.corriendo = false;
+  limpiarTimers();
+
+  // Shake final
+  gameArea.classList.add('shake');
+  setTimeout(() => gameArea.classList.remove('shake'), 500);
+
+  loseTime.textContent = state.tiempoTranscurrido + 's';
+  loseResolved.textContent = state.eventosResueltos;
+
+  setTimeout(() => modalLose.classList.add('active'), 400);
+}
+
+function limpiarTimers() {
+  if (state.spawnTimerId)  { clearTimeout(state.spawnTimerId); state.spawnTimerId = null; }
+  if (state.clockTimerId)  { clearInterval(state.clockTimerId); state.clockTimerId = null; }
+  if (state.gameLoopId)    { cancelAnimationFrame(state.gameLoopId); state.gameLoopId = null; }
+}
+
+// ---------- INPUT DE TECLADO (para llamadas en desktop) ----------
+if (!esMovil) {
+  document.addEventListener('keydown', (e) => {
+    if (!state.corriendo) return;
+    const tecla = e.key.toUpperCase();
+    if (!TECLAS_POSIBLES.includes(tecla)) return;
+
+    // Buscar el primer evento de tipo "call"
+    for (const evento of state.eventos.values()) {
+      if (evento.tipo !== 'call') continue;
+      procesarTeclaLlamada(evento, tecla);
+      break; // Solo procesar un evento de llamada a la vez
+    }
+  });
+}
+
+// ---------- LISTENERS DE BOTONES ----------
+btnStart.addEventListener('click', iniciarJuego);
+btnRetry.addEventListener('click', iniciarJuego);
+btnContinue.addEventListener('click', iniciarJuego);  // Reinicia el juego
+
+// ---------- INIT ----------
+if (localStorage.getItem(STORAGE_KEY) === 'true') {
+  saveStatusEl.textContent = 'regalo ya completado ✓';
+  saveStatusEl.style.color = 'var(--green)';
+}
+actualizarUI();
+
+// Log de detección de dispositivo
+console.log(`Dispositivo detectado: ${esMovil ? 'Móvil' : 'Desktop'}`);
+</script>
+</body>
+</html>
